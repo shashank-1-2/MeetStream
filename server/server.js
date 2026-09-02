@@ -16,9 +16,21 @@ const server = http.createServer(app);
 // Connect to Neon & Initialize Tables
 initDB().catch((err) => console.error("Failed to initialize DB:", err));
 
-const allowedOrigins = process.env.ORIGINS.split(",")
-app.use(cors({origin: allowedOrigins, credentials: true}))
-app.use(cookieParser())
+const allowedOrigins = process.env.ORIGINS.split(",");
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow non-browser requests (curl, server-to-server)
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/meet-stream-.*\.vercel\.app$/.test(origin);
+    callback(isAllowed ? null : new Error("Not allowed by CORS"), isAllowed);
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.use(cookieParser());
 
 app.use("/api/clerk", express.raw({type: "application/json"}), handleClerkWebhook)
 app.use(express.json())
@@ -28,8 +40,8 @@ app.get("/", (req, res)=> res.send("API is Live!"))
 app.use("/api/meetings", meetingRouter);
 
 const io = new Server(server, {
-    cors: {origin: allowedOrigins, credentials: true}
-})
+  cors: corsOptions
+});
 
 setupSocketIO(io);
 
