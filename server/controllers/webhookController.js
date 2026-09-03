@@ -21,7 +21,8 @@ export const handleClerkWebhook = async (req, res) => {
                     INSERT INTO users (id, name, email, image, plan)
                     VALUES (${userId}, ${name}, ${primaryEmail}, ${image}, ${plan})
                     ON CONFLICT (id) DO UPDATE SET
-                    email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
+                    id = EXCLUDE.id,    
+                    email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email)
                     name = EXCLUDED.name,
                     image = EXCLUDED.image,
                     plan = EXCLUDED.plan,
@@ -39,6 +40,7 @@ export const handleClerkWebhook = async (req, res) => {
                     INSERT INTO users (id, name, email, image)
                     VALUES (${userId}, ${name}, ${primaryEmail}, ${image})
                     ON CONFLICT (id) DO UPDATE SET
+                    id = EXCLUDE.id,
                     email = EXCLUDED.email,
                     name = EXCLUDED.name,
                     image = EXCLUDED.image,
