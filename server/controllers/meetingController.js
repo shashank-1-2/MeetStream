@@ -1,3 +1,4 @@
+import { clerkClient } from "@clerk/express";
 import { sql } from "../config/db.js";
 
 const generateMeetingId = () => {
@@ -6,14 +7,36 @@ const generateMeetingId = () => {
     return `${segment(3)}-${segment(4)}-${segment(3)}`;
 }
 
+// Ensures a user row exists in our DB, pulling from Clerk if it's missing
+// (covers cases where the webhook hasn't fired yet, failed, or was misconfigured)
+const ensureUserExists = async (userId) => {
+    let users = await sql`SELECT name, plan FROM users WHERE id = ${userId}`;
+
+    if (users.length === 0) {
+        const clerkUser = await clerkClient.users.getUser(userId);
+        const primaryEmail = clerkUser.emailAddresses?.[0]?.emailAddress || "";
+        const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User";
+        const image = clerkUser.imageUrl || "";
+
+        await sql`
+            INSERT INTO users (id, name, email, image, plan)
+            VALUES (${userId}, ${name}, ${primaryEmail}, ${image}, 'free')
+            ON CONFLICT (id) DO NOTHING`;
+
+        users = await sql`SELECT name, plan FROM users WHERE id = ${userId}`;
+    }
+
+    return users;
+}
+
 // create meeting
 export const createMeeting = async (req, res) => {
     try {
         const { title } = req.body;
         const userId = req.user.id;
 
-        // Fetch user details & plan
-        const users = await sql`SELECT name, plan FROM users WHERE id = ${userId}`;
+        // Fetch user details & plan (self-heals if user row is missing)
+        const users = await ensureUserExists(userId);
         const userPlan = users[0]?.plan || "free";
 
         // check meetings limit per calendar month
@@ -116,6 +139,7 @@ export const getMeeting = async (req, res) => {
 export const getUserSessions = async (req, res) => {
     try {
         const userId = req.user.id;
+        await ensureUserExists(userId);
 
         // Fetch meetings where user is host OR listed in participants
         const meetings = await sql`
@@ -185,6 +209,7 @@ export const getSessionDetails = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user.id;
+        await ensureUserExists(userId);
 
         const meetings = await sql`
             SELECT
@@ -263,7 +288,7 @@ export const getSessionDetails = async (req, res) => {
 export const getMeetingStats = async (req, res) => {
     try {
         const userId = req.user.id;
-        const users = await sql`SELECT plan FROM users WHERE id = ${userId}`;
+        const users = await ensureUserExists(userId);
         const plan = users[0]?.plan || "free";
 
         const monthlyCountResult = await sql`
