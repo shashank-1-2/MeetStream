@@ -21,15 +21,14 @@ export const handleClerkWebhook = async (req, res) => {
                     INSERT INTO users (id, name, email, image, plan)
                     VALUES (${userId}, ${name}, ${primaryEmail}, ${image}, ${plan})
                     ON CONFLICT (id) DO UPDATE SET
-                    id = EXCLUDE.id,    
-                    email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email)
+                    email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
                     name = EXCLUDED.name,
                     image = EXCLUDED.image,
                     plan = EXCLUDED.plan,
                     updated_at = NOW()`;
-                    break;
+                break;
             }
-            
+
             case "user.updated": {
                 const userId = data.id;
                 const primaryEmail = data.email_addresses?.[0]?.email_address || "";
@@ -40,12 +39,11 @@ export const handleClerkWebhook = async (req, res) => {
                     INSERT INTO users (id, name, email, image)
                     VALUES (${userId}, ${name}, ${primaryEmail}, ${image})
                     ON CONFLICT (id) DO UPDATE SET
-                    id = EXCLUDE.id,
                     email = EXCLUDED.email,
                     name = EXCLUDED.name,
                     image = EXCLUDED.image,
                     updated_at = NOW()`;
-                    break;
+                break;
             }
 
             case "user.deleted": {
@@ -56,11 +54,11 @@ export const handleClerkWebhook = async (req, res) => {
                 }
                 break;
             }
-        
+
             default:
                 console.log(`Unhandled Clerk webhook event type: ${eventType}`);
         }
-        
+
         return res.status(200).json({ success: true, eventType });
 
     } catch (error) {
